@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>图片字幕生成器</title>
+  <style>
+    :root { --bg:#0f1114; --card:#141821; --text:#e9eef5; --muted:#aab2c0; --accent:#50a4ff; --border:#222736; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 14px;
+      padding: 14px;
+    }
+    .card { background: var(--card); border:1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .card-title { margin:0 0 8px 0; font-size:13px; font-weight:600; opacity:.9; }
+    .row { margin-bottom: 12px; }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 12px;
+      opacity: 0.8;
+    }
+    input[type="file"], input[type="text"], textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0e1118;
+      color: var(--text);
+      outline: none;
+      font-size: 14px;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+      line-height: 1.6;
+    }
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btns { display: flex; gap: 10px; align-items: center; }
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: #0e1118;
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.primary { background: var(--accent); border-color: #1773e6; color: #001427; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .preview-wrap {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow: auto;
+      position: sticky;
+      top: 14px;
+      max-height: calc(100vh - 80px);
+    }
+    canvas { max-width: 100%; background: #000; border-radius: 10px; }
+    .hint { font-size: 12px; color: var(--muted); }
+    .inline { display: flex; gap: 8px; align-items: center; }
+    .range-row { display: grid; grid-template-columns: 120px 1fr 60px; gap: 8px; align-items: center; }
+    input[type="range"] { width: 100%; }
+    details { border:1px dashed var(--border); border-radius:10px; padding:10px; }
+    details > summary { cursor:pointer; font-weight:600; color: var(--muted); margin-bottom:8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>图片字幕生成器</h1>
+  </header>
+  <div class="container">
+    <section class="card">
+      <div class="card-title">输入</div>
+      <div class="row">
+        <label>上传图片</label>
+        <input id="imageInput" type="file" accept="image/*" />
+      </div>
+      <div class="hint">请上传本地图片，导出更稳定</div>
+      <div class="row">
+        <label>文件信息</label>
+        <input id="fileMeta" type="text" readonly placeholder="未选择文件" />
+      </div>
+      <div class="row">
+        <label>字幕文本（每行一条）</label>
+        <textarea id="textInput" placeholder="在这里输入字幕，每行一条&#10;示例：&#10;我这里看起来很美&#10;太阳像一只熟透的大橘子&#10;咬一口就会从牙齿甜到心里"></textarea>
+      </div>
+      <div class="card-title">样式</div>
+      <div class="row controls">
+        <div>
+          <label>字体大小（px）</label>
+          <input id="fontSize" type="number" min="12" max="120" step="1" value="40" />
+        </div>
+        <div>
+          <label>字幕高度（px）</label>
+          <input id="subtitleHeight" type="number" min="20" max="200" step="1" value="80" />
+        </div>
+      </div>
+      <div class="row">
+        <label>内边距（px）</label>
+        <input id="padding" type="number" min="0" max="80" step="1" value="16" />
+      </div>
+      <div class="row controls">
+        <div>
+          <label>背景颜色</label>
+          <input id="barColor" type="color" value="#000000" />
+        </div>
+        <div>
+          <label>不透明度（%）</label>
+          <input id="barOpacity" type="range" min="0" max="100" step="1" value="60" />
+        </div>
+      </div>
+      <div class="row controls">
+        <div>
+          <label>描边线宽（px）</label>
+          <input id="outlineWidth" type="number" min="0" max="6" step="1" value="2" />
+        </div>
+        <div class="inline" style="align-items:center">
+          <label class="inline"><input id="shadowOutline" type="checkbox" checked /> 启用描边</label>
+        </div>
+      </div>
+      <details id="advanced">
+        <summary>高级样式</summary>
+        <div class="row">
+          <label>字体颜色</label>
+          <input id="fontColor" type="color" value="#ffffff" />
+        </div>
+        <div class="row">
+          <label>描边颜色</label>
+          <input id="outlineColor" type="color" value="#000000" />
+        </div>
+        <div class="row controls">
+          <div>
+            <label>字体</label>
+            <select id="fontFamily">
+              <option value="yahei" selected>微软雅黑</option>
+              <option value="pingfang">苹方</option>
+              <option value="heiti">黑体</option>
+              <option value="songti">宋体</option>
+              <option value="kaiti">楷体</option>
+              <option value="fangsong">仿宋</option>
+              <option value="notoSans">思源黑体/Noto Sans SC</option>
+              <option value="notoSerif">思源宋体/Noto Serif SC</option>
+              <option value="handwriting">手写体</option>
+            </select>
+          </div>
+          <div>
+            <label>字体样式</label>
+            <select id="fontStyle">
+              <option value="normal" selected>正常</option>
+              <option value="italic">斜体</option>
+              <option value="oblique">倾斜</option>
+            </select>
+          </div>
+          <div>
+            <label>字体粗细</label>
+            <select id="fontWeight">
+              <option value="400">常规</option>
+              <option value="500">中等</option>
+              <option value="700" selected>加粗</option>
+              <option value="900">特粗</option>
+            </select>
+          </div>
+        </div>
+      </details>
+      <div class="btns">
+        <button id="generate" class="primary">生成字幕图片</button>
+        <button id="download" disabled>保存图片</button>
+        <span id="status" class="hint"></span>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-title">预览</div>
+      <div class="preview-wrap"><canvas id="canvas"></canvas></div>
+    </section>
+  </div>
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const textInput  = document.getElementById('textInput');
+    const fontSizeEl = document.getElementById('fontSize');
+    const subtitleHeightEl = document.getElementById('subtitleHeight');
+    const paddingEl = document.getElementById('padding');
+    const shadowOutlineEl = document.getElementById('shadowOutline');
+    const outlineWidthEl = document.getElementById('outlineWidth');
+    const barColorEl = document.getElementById('barColor');
+    const barOpacityEl = document.getElementById('barOpacity');
+    const fontColorEl = document.getElementById('fontColor');
+    const outlineColorEl = document.getElementById('outlineColor');
+    const fontStyleEl = document.getElementById('fontStyle');
+    const fontWeightEl = document.getElementById('fontWeight');
+    const fontFamilyEl = document.getElementById('fontFamily');
+    const generateBtn = document.getElementById('generate');
+    const downloadBtn = document.getElementById('download');
+    const statusEl = document.getElementById('status');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const fileMetaEl = document.getElementById('fileMeta');
+
+    let loadedImage = null;
+    let corsTainted = false;
+
+    function throttleRender() {
+      renderDebounced();
+    }
+
+    imageInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      corsTainted = false;
+      loadedImage = await loadImage(url, false);
+      URL.revokeObjectURL(url);
+      const w = loadedImage.naturalWidth || loadedImage.width;
+      const h = loadedImage.naturalHeight || loadedImage.height;
+      fileMetaEl.value = `${file.name}（${w}×${h}）`;
+      statusEl.textContent = '图片已加载';
+      renderDebounced();
+    });
+
+
+    async function loadImage(src, useCORS) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        if (useCORS) img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    function getLines() {
+      return (textInput.value || '')
+        .split(/\r?\n/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+    }
+
+    const FONT_FAMILIES = {
+      yahei: '"Microsoft YaHei", "PingFang SC", "Noto Sans SC", Arial, sans-serif',
+      heiti: 'SimHei, "Microsoft YaHei", "PingFang SC", Arial, sans-serif',
+      songti: 'SimSun, "Songti SC", "Noto Serif SC", serif',
+      kaiti: 'KaiTi, STKaiti, "Kaiti SC", serif',
+      fangsong: 'FangSong, "Noto Serif SC", serif',
+      pingfang: '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", Arial, sans-serif',
+      notoSans: '"Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", Arial, sans-serif',
+      notoSerif: '"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif',
+      handwriting: '"Comic Sans MS", "Bradley Hand", "KaiTi", cursive'
+    };
+    function parseHexColor(hex) {
+      const h = hex.replace('#','');
+      const r = parseInt(h.substring(0,2),16);
+      const g = parseInt(h.substring(2,4),16);
+      const b = parseInt(h.substring(4,6),16);
+      return {r,g,b};
+    }
+
+    function drawSubtitleBar(img, y, w, h, imgH, text, options, useBottomSliceBg) {
+      const paddingX = options.padding;
+      if (useBottomSliceBg) {
+        const sx = 0;
+        const sy = Math.max(0, imgH - h);
+        ctx.drawImage(img, sx, sy, w, h, 0, y, w, h);
+      }
+      const {r,g,b} = parseHexColor(options.barColor);
+      if (options.barOpacity > 0) {
+        ctx.fillStyle = `rgba(${r},${g},${b},${options.barOpacity})`;
+        ctx.fillRect(0, y, w, h);
+      }
+      const baseSize = options.fontSize;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `${options.fontStyle} ${options.fontWeight} ${baseSize}px ${options.fontFamily}`;
+      const textY = y + h / 2;
+      const textW = ctx.measureText(text).width;
+      const available = w - paddingX * 2;
+      const overflow = textW > available;
+      if (options.shadowOutline && options.outlineWidth > 0) {
+        ctx.lineJoin = 'round';
+        ctx.miterLimit = 3;
+        ctx.lineWidth = options.outlineWidth;
+        ctx.strokeStyle = options.outlineColor;
+        ctx.strokeText(text, w / 2, textY);
+      }
+      ctx.fillStyle = options.fontColor;
+      ctx.fillText(text, w / 2, textY);
+      return overflow;
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    function render() {
+      statusEl.textContent = '';
+      const img = loadedImage;
+      if (!img) return;
+      const lines = getLines();
+      if (lines.length === 0) {
+        statusEl.textContent = '请输入至少一行字幕';
+        return;
+      }
+      if (lines.length > 20) {
+        statusEl.textContent = '行数上限为 20 行';
+        return;
+      }
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const subH = Number(subtitleHeightEl.value);
+      const lineGap = 0;
+      const extraCount = Math.max(0, lines.length - 1);
+      const stackHeight = extraCount > 0 ? extraCount * (subH + lineGap) : 0;
+      canvas.width = w;
+      canvas.height = h + stackHeight;
+      ctx.drawImage(img, 0, 0, w, h);
+      const options = {
+        fontSize: Number(fontSizeEl.value),
+        shadowOutline: shadowOutlineEl.checked,
+        outlineWidth: Number(outlineWidthEl.value),
+        fontColor: fontColorEl.value,
+        outlineColor: outlineColorEl.value,
+        fontStyle: fontStyleEl.value,
+        fontWeight: fontWeightEl.value,
+        fontFamily: FONT_FAMILIES[fontFamilyEl.value] || FONT_FAMILIES.yahei,
+        padding: Number(paddingEl.value),
+        barColor: barColorEl.value,
+        barOpacity: Number(barOpacityEl.value) / 100
+      };
+      let overflowAny = false;
+      // 第一行：直接在原图底部区域，不复制背景
+      if (lines[0]) {
+        const y1 = h - subH;
+        overflowAny = drawSubtitleBar(img, y1, w, subH, h, lines[0], options, false) || overflowAny;
+      }
+      // 其余行：在画布追加区域绘制，背景使用原图底部的同一片区域
+      let y = h;
+      for (let i = 1; i < lines.length; i++) {
+        overflowAny = drawSubtitleBar(img, y, w, subH, h, lines[i], options, true) || overflowAny;
+        y += subH + lineGap;
+      }
+      downloadBtn.disabled = false;
+      statusEl.textContent = overflowAny ? '字幕图片生成成功！（存在可能溢出的行）' : '字幕图片生成成功！';
+    }
+
+    let renderTimer = null;
+    function renderDebounced() {
+      if (renderTimer) clearTimeout(renderTimer);
+      renderTimer = setTimeout(() => {
+        render();
+      }, 300);
+    }
+
+    generateBtn.addEventListener('click', render);
+
+    downloadBtn.addEventListener('click', () => {
+      try {
+        const url = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        const d = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const name = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}`;
+        a.download = `${name}.png`;
+        a.click();
+      } catch (e) {
+        statusEl.textContent = '导出失败（可能是跨域图片导致）';
+      }
+    });
+
+    // 选择输入框内容的易用性增强：支持 Ctrl/Cmd + A 全选
+    function enhanceSelectAll(el) {
+      el.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+          e.preventDefault();
+          el.select();
+        }
+      });
+    }
+    document.querySelectorAll('input[type="text"], textarea').forEach(enhanceSelectAll);
+    [textInput, fontSizeEl, subtitleHeightEl, paddingEl, shadowOutlineEl, outlineWidthEl, barColorEl, barOpacityEl, fontColorEl, outlineColorEl, fontStyleEl, fontWeightEl, fontFamilyEl].forEach(el => {
+      el.addEventListener('input', throttleRender);
+      el.addEventListener('change', throttleRender);
+    });
+  </script>
+</body>
+</html>
